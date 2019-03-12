@@ -8,6 +8,7 @@ class Eye():
         self.tracker = tracker
         self.polar = polar
         self.cap = cv2.VideoCapture(feed)
+        self.__set_frame_properties(640, 480)
         self.ring = None
         self.centroid = None
         self.normalized = None
@@ -21,18 +22,23 @@ class Eye():
                 frame = cv2.flip(frame, 0)
             elif side == 'r':
                 frame = cv2.flip(frame, 1)
-            self.__process_frame(frame, side)
+            self.__process_frame(frame, 640, 480, side)
             return self.__post_frame(frame)
         return False, None
+
+
+    def __set_frame_properties(self, width, height):
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             
     
-    def __process_frame(self, frame, side=None):
+    def __process_frame(self, frame, width, height, side=None):
         ellipse = self.tracker.find_pupil(frame)
         if ellipse is not None:
             cv2.ellipse(frame, ellipse, (0,255,0), 2)
             self.excentricity = ellipse[1][1]/ellipse[1][0]
-            x = ellipse[0][0]/800
-            y = ellipse[0][1]/600
+            x = ellipse[0][0]/width
+            y = ellipse[0][1]/height
             self.centroid = np.array([x,y], float)
             if self.ring is not None: 
                 #self.normalized = self.polar.to_elliptical_space(ellipse[0], False)

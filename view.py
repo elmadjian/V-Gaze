@@ -27,7 +27,11 @@ class View(Thread):
         device = None
         devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
         for d in devices:
-            if "keyboard" in d.name:
+            # if "keyboard" in d.name or "Keyboard" in d.name:
+            #     device = d
+            #     break
+            if "SONiX USB DEVICE" in d.name and\
+                "input0" in d.phys:
                 device = d
                 break
 
@@ -36,7 +40,7 @@ class View(Thread):
         if device is not None:
             for event in device.read_loop():
                 if event.type == ecodes.EV_KEY:
-                    #print(event.code)
+                    print(event.code)
                     if event.code == 46 and event.value == 1: #'c'
                         self.calibration = not self.calibration
                         if self.calibration:

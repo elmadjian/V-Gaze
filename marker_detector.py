@@ -38,7 +38,7 @@ class MarkerDetector():
 
 
     def _find_contours(self, img):
-        contours = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[1]
+        contours = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[0]
         contour_list = []
         for c in contours:
             if len(c) > 5:

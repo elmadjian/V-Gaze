@@ -10,7 +10,6 @@ import calibrator
 import depth
 import time
 import calib_screen
-#import realsense
 import threading
 import scene
 #import visualizer_3d
@@ -83,8 +82,6 @@ class Controller():
             calib = None
             if self.in3d == 'gpr':
                 calib = calibrator.Calibrator(binocular=True, in3d=True)
-            elif self.in3d == 'realsense' or self.in3d == 'hololens':
-                calib = calibrator.Calibrator_3D()
             self.calibrations[id][0] = calib
             if self.in3d == 'hololens':
                 return
@@ -135,10 +132,8 @@ class Controller():
 
 
     def run(self, publish, ip=""):
-        if self.in3d == 'gpr' or self.in3d == 'realsense':
+        if self.in3d == 'gpr':
             self.run_3d(publish, ip)
-        elif self.in3d == 'hololens':
-            self.run_hololens(publish, ip)
         else:
             self.run_2d(publish, ip)
 
@@ -148,9 +143,9 @@ class Controller():
         kbd = view.View(self, self.pipe_father)
         scn.start()
         kbd.start()
-        net = network.Network()
-        if publish:
-            net.create_connection(ip)
+        # net = network.Network()
+        # if publish:
+        #     net.create_connection(ip)
         while True:
             if scn.frame is not None:
                 cv2.imshow('left', self.left_e.get_frame('l'))
@@ -170,97 +165,15 @@ class Controller():
                         cv2.circle(scn.frame, lcoord, 12, (200,0,200),-1)
                         cv2.circle(scn.frame, rcoord, 12, (0,200,200),-1)
                 cv2.imshow('scene', scn.frame)
-            if cv2.waitKey(5) & 0xFF == ord('q'):
+            if cv2.waitKey(2) & 0xFF == ord('q'):
                 scn.quit = True
                 break
         kbd.join()
         scn.join()
-        net.close()
+        #net.close()
         cv2.destroyAllWindows()
 
 
-    def run_3d(self, publish, ip=""):
-        scn = realsense.RealSense(640, 480)
-        kbd = view.View(self, self.pipe_father)
-        planes = [0.75, 1.35, 2.0]
-        left  = np.array((-0.12, 0.08, -0.05), float)
-        right = np.array((-0.02, 0.08, -0.05), float)
-        net = network.Network()
-        if publish:
-            net.create_connection(ip)
-        p_father, p_child = Pipe()
-        proc = Process(target=visualizer_3d.Visualizer, 
-                    args=(planes, left, right, p_child,))
-        proc.start()
-        scn.start()
-        kbd.start()
-        while True:
-            if scn.color_frame is not None:
-                cv2.imshow('left', self.left_e.get_frame('l'))
-                cv2.imshow('right', self.right_e.get_frame('r'))
-                le_c = self.left_e.centroid
-                re_c = self.right_e.centroid
-                if self.calibrating:
-                    scn.set_marker_position()
-                    target = scn.coord3D
-                    self.__collect_data(target, le_c, re_c)
-                    if self.pipe_father.poll():
-                        cv2.imshow("calibration", self.pipe_father.recv())
-                elif self.active:
-                    if self.in3d == 'gpr':
-                        coord = self.calibrations[self.active][0].predict(le_c, re_c)
-                        if coord is not None:
-                            net.publish_coord("gaze", coord)
-                            p_father.send([coord, coord])
-                    elif self.in3d == 'realsense':
-                        lc,rc = self.calibrations[self.active][0].get_gaze_vector(le_c, re_c)
-                        net.publish_vector("gaze", lc, rc)
-                        p_father.send([lc, rc])
-                cv2.imshow('scene', scn.color_frame)
-            if cv2.waitKey(6) & 0xFF == ord('q'):
-                scn.quit = True
-                break
-        kbd.join()
-        scn.join()
-        proc.terminate()
-        net.close()
-        cv2.destroyAllWindows()
-
-
-    def run_hololens(self, publish, ip=""):
-        kbd = view.View(self, self.pipe_father)
-        planes = [0.4, 2.0]
-        left  = np.array((-0.05, -0.08, -0.05), float)
-        right = np.array(( 0.05, -0.08, -0.05), float)
-        net = network.Network()
-        if publish:
-            net.create_connection(ip)
-        p_father, p_child = Pipe()
-        proc = Process(target=visualizer_3d.Visualizer, 
-                    args=(planes, left, right, p_child,))
-        proc.start()
-        kbd.start()
-        while True:
-            fr_le = self.left_e.get_frame('l')
-            fr_re = self.right_e.get_frame('r')
-            if fr_le is not None and fr_re is not None:
-                cv2.imshow('left', fr_le)
-                cv2.imshow('right', fr_re)
-                le_c = self.left_e.centroid
-                re_c = self.right_e.centroid
-                if self.calibrating:
-                    target = net.recv_target()
-                    self.__collect_data(target, le_c, re_c)
-                elif self.active:
-                    lc,rc = self.calibrations[self.active][0].get_gaze_vector(le_c, re_c)
-                    net.publish_vector("gaze", lc, rc)
-                    p_father.send([lc, rc])
-            if cv2.waitKey(6) & 0xFF == ord('q'):
-                break
-        kbd.join()
-        proc.terminate()
-        net.close()
-        cv2.destroyAllWindows()
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 #====================================================================
@@ -271,9 +184,8 @@ if __name__=="__main__":
             + "--cam: Connected video input devices\n"
             + "--vid: Load saved video files\n"
             + "--hol: Hololens as scene camera\n\n"
-            + "OPTIONS ('gpr' or 'rs' are mandatory for 3D):\n"
-            + "--gpr: Gaussian Processes Regressor for 3D\n"
-            + "--rs:  RealSense camera backend and 3D gaze vector\n"
+            + "OPTIONS:\n"
+            + "--gpr: Gaussian Processes Regressor\n"
             + "--pub: Publish gaze estimation data\n\n"
             + "PARAMS (optional):\n"
             + "--cam 1 2 3: Left eye camera is loaded from /dev/video1,\n"
@@ -287,10 +199,6 @@ if __name__=="__main__":
         sys.exit()
     elif '--gpr' in sys.argv:
         controller = Controller(sys.argv, 'gpr')
-    elif '--rs' in sys.argv:
-        controller = Controller(sys.argv, 'realsense')
-    elif '--hol' in sys.argv:
-        controller = Controller(sys.argv, 'hololens')
     else:
         controller = Controller(sys.argv)
 

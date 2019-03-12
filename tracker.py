@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from skimage import exposure
 
 class Tracker():
 
@@ -16,10 +17,13 @@ class Tracker():
         OUT: ellipse 
         '''
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(img, (9,9), 7)
+        pp = exposure.rescale_intensity(img, in_range=(0,150))
+        blur = cv2.GaussianBlur(img, (7,7), 5)
         minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(blur)
-        ret, thresh = cv2.threshold(img, minVal+15, 255, cv2.THRESH_BINARY_INV)
-        blob = self.__get_blob(thresh)
+        ret, thresh = cv2.threshold(img, minVal+25, 255, cv2.THRESH_BINARY_INV)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
+        morph = cv2.erode(thresh, kernel, iterations=2)
+        blob = self.__get_blob(morph)
         cnt = self.__get_contours(blob)
         if cnt is not None:
             cnt_e, ellipse = self.__get_ellipse(cnt, img)
@@ -29,6 +33,33 @@ class Tracker():
                     self.update_centroids(ellipse[0])
                     return ellipse
 
+
+    def __inpaint(self, img, mask):
+        ret, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
+        count = 0
+        for s in stats:
+            if s[4] < 1000:
+                x0, y0 = s[0]-7, s[1]-7
+                x1, y1 = x0+s[2]+7, y0+s[3]+7
+                neighbor = []
+                tmp = np.zeros(img.shape, dtype=np.uint8)
+                for i in range(y0, y1):
+                    for j in range(x0, x1):
+                        tmp[i][j] = 255
+                        if mask[i][j] == 0:
+                            neighbor.append(img[i][j])
+                median = np.median(neighbor)-10
+                for i in range(y0, y1):
+                    for j in range(x0, x1):
+                        if mask[i][j] > 0:
+                            img[i][j] = median
+                blur = cv2.GaussianBlur(img, (13,13), 9)
+                img = np.where(tmp == 255, blur, img)
+            count += 1
+        return img    
+            
+
+    
 
     def __get_blob(self, bin_img):
         '''
@@ -92,9 +123,11 @@ class Tracker():
         '''
         #TODO: if there are multiple ellipses, choose the one with higher conf rate
         blob_area = cv2.contourArea(blob_contour)
-        ellipse_area = cv2.contourArea(ellipse_contour[0])
-        if ellipse_area > 0:
-            return blob_area/ellipse_area
+        #print(len(blob_contour), len(ellipse_contour))
+        if len(ellipse_contour) >= 1:
+            ellipse_area = cv2.contourArea(ellipse_contour[0])
+            if ellipse_area > 0:
+                return blob_area/ellipse_area
         return 0
 
     

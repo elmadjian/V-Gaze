@@ -29,7 +29,7 @@ class SceneCamera(Thread):
                 self.frame = frame
             else:
                 self.frame = None
-            time.sleep(0.005)
+            #time.sleep(0.005)
 
 
     def get_marker_position(self):
