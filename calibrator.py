@@ -2,33 +2,38 @@ import cv2
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process import kernels
+import matplotlib.pyplot as plt
 
 class Calibrator():
 
-    def __init__(self, binocular=True, in3d=False):
+    def __init__(self, ntargets, binocular=True, in3d=False):
         self.calib_point = np.array((0,0), float)
-        self.targets = np.empty((0,2), float)
+        self.targets = {i:np.empty((0,2), float) for i in range(ntargets)}
         if in3d:
             self.targets = np.empty((0,3), float)
             self.calib_point = np.array((0,0,0), float)
-        self.l_centers = np.empty((0,2), float)
-        self.r_centers = np.empty((0,2), float)
+        self.l_centers = {i:np.empty((0,2), float) for i in range(ntargets)}
+        self.r_centers = {i:np.empty((0,2), float) for i in range(ntargets)}
         self.countdown = 9
         self.regressor = None
         self.binocular = binocular
+        self.ntg = ntargets
 
 
-    def collect_data(self, target, leye, reye=None):
+    def collect_data(self, target, t_id, leye, reye=None):
         diff = np.abs(np.subtract(self.calib_point, target))
         if np.sum(diff) > 0.09:
             self.calib_point = target
             self.countdown = 9
         self.countdown -= 1
         if self.countdown <= 0:
-            self.targets = np.vstack((self.targets, target))
-            self.l_centers = np.vstack((self.l_centers, leye))
+            self.targets[t_id] = np.vstack((self.targets, target))
+            self.l_centers[t_id] = np.vstack((self.l_centers, leye))
             if reye is not None:
-                self.r_centers = np.vstack((self.r_centers, reye))
+                self.r_centers[t_id] = np.vstack((self.r_centers, reye))
+
+    def __clean_up_data(self):
+        pass
 
 
     def estimate_gaze(self):
@@ -38,6 +43,7 @@ class Calibrator():
                                        n_restarts_optimizer=9,
                                        kernel = kernel)
         if self.binocular:
+            #FIX THIS!
             input_data = np.hstack((self.l_centers, self.r_centers))
             clf.fit(input_data, self.targets)
         else:
@@ -56,6 +62,15 @@ class Calibrator():
             if len(coord) == 3:
                 return coord 
             return (int(x), int(y))
+
+
+    def plot_data(self):
+        for i in range(self.ntg):
+            plt.scatter(self.targets[i][:,0], self.targets[i][:,1], color='darkorange', marker='+')
+            plt.scatter(self.l_centers[i][:,0], self.l_centers[i][:,1], color='blue', marker='+')
+            if self.binocular:
+                plt.scatter(self.r_centers[i][:,0], self.r_centers[i][:,1], color='red', marker='+')
+        plt.show()
 
 #---------------------------------------------------------------
 

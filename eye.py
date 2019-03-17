@@ -4,9 +4,8 @@ import numpy as np
 
 class Eye():
 
-    def __init__(self, tracker, polar, feed):
+    def __init__(self, tracker, feed):
         self.tracker = tracker
-        self.polar = polar
         self.cap = cv2.VideoCapture(feed)
         self.__set_frame_properties(640, 480)
         self.ring = None
@@ -40,12 +39,6 @@ class Eye():
             x = ellipse[0][0]/width
             y = ellipse[0][1]/height
             self.centroid = np.array([x,y], float)
-            if self.ring is not None: 
-                #self.normalized = self.polar.to_elliptical_space(ellipse[0], False)
-                self.normalized = self.polar.to_elliptical_space(ellipse[0], True)
-                #self.centroid = self.normalized
-                self.__draw_ellipse_axes(frame, self.ring)
-
 
 
     def __post_frame(self, frame):

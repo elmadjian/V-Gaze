@@ -16,10 +16,9 @@ class View(Thread):
     def run(self):
         '''
         Callback for keyboard
-        's' KEY is used to toggle pupil action area mapping
-        'r' KEY resets the pupil action model
         'c' KEY is used to trigger calibration procedure
         'n' KEY is used to make calibration targets move to the next position
+        'x' KEY exchanges left for right eye stream
         'q' KEY is used to quit
         'SHIFT + [1-9]' selects a calibration
         'SHIFT + 0' disables calibration 
@@ -40,7 +39,7 @@ class View(Thread):
         if device is not None:
             for event in device.read_loop():
                 if event.type == ecodes.EV_KEY:
-                    print(event.code)
+                    #print(event.code)
                     if event.code == 46 and event.value == 1: #'c'
                         self.calibration = not self.calibration
                         if self.calibration:
@@ -49,16 +48,12 @@ class View(Thread):
                             print("finished calibration")
                             self.controller.end_calibration()
                    
-                    if event.code == 31 and event.value == 1: #'s'
-                        print("detecting pupil action area")
-                        self.controller.build_model()
-
-                    if event.code == 19 and event.value == 1: #'r'
-                        print('resetting model')
-                        self.controller.reset_model()
-
                     if event.code == 49 and event.value == 1: #'n'
                         self.pipe.send('next')
+
+                    if event.code == 45 and event.value == 1: #'x'
+                        print('exchanging eye streams')
+                        self.controller.exchange()
 
                     if event.code in calibrations and event.value == 1: #'0-9'
                         '''

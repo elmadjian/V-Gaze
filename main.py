@@ -2,7 +2,6 @@ import cv2
 import sys
 import numpy as np
 import tracker
-import polar
 import view
 import eye
 import marker_detector
@@ -25,8 +24,6 @@ class Controller():
         self.le_video = None
         self.re_video = None
         self.sc_video = None
-        self.polar_le = polar.Polar()
-        self.polar_re = polar.Polar()
         self.le_track = tracker.Tracker()
         self.re_track = tracker.Tracker()
         self.d_estimator  = depth.DepthEstimator()
@@ -34,8 +31,8 @@ class Controller():
         self.calibrating  = False
         self.active  = False
         self.__setup_video_input(argv)
-        self.left_e  = eye.Eye(self.le_track, self.polar_le, self.le_video)
-        self.right_e = eye.Eye(self.re_track, self.polar_re, self.re_video)
+        self.left_e  = eye.Eye(self.le_track, self.le_video)
+        self.right_e = eye.Eye(self.re_track, self.re_video)
         self.marker  = cv2.imread('marker2.png', cv2.IMREAD_GRAYSCALE)
         self.screen  = None
         self.in3d    = in3d
@@ -50,30 +47,15 @@ class Controller():
             if "--cam" in argv:
                 self.sc_video = vid.get_rs_id()
             #print(self.le_video, self.re_video, self.sc_video)
-        elif "--vid" in argv and len(argv) < 5:
-            self.le_video = 'videos/left003.avi'
-            self.re_video = 'videos/right003.avi'
-            self.sc_video = 'videos/scene003.avi'
         else:
             self.le_video = int(argv[2])
             self.re_video = int(argv[3])
             self.sc_video = int(argv[4])
 
-
-    def build_model(self):
-        le_ring = self.polar_le.update_model(self.le_track.centroids)
-        re_ring = self.polar_re.update_model(self.re_track.centroids)
-        self.le_track.update_centroids(self.polar_le.extremes)
-        self.re_track.update_centroids(self.polar_re.extremes)
-        self.left_e.ring = le_ring
-        self.right_e.ring = re_ring
-
-
-    def reset_model(self):
-        self.polar_le.extremes = None
-        self.polar_re.extremes = None
-        self.le_track.centroids = np.empty((0,2), float)
-        self.re_track.centroids = np.empty((0,2), float)
+    def exchange(self):
+        temp = self.left_e.cap
+        self.left_e.cap = self.right_e.cap
+        self.right_e.cap = temp
 
 
     def calibrate(self, id):
@@ -81,15 +63,15 @@ class Controller():
         if self.in3d:
             calib = None
             if self.in3d == 'gpr':
-                calib = calibrator.Calibrator(binocular=True, in3d=True)
+                calib = calibrator.Calibrator(12, binocular=True, in3d=True)
             self.calibrations[id][0] = calib
             if self.in3d == 'hololens':
                 return
             self.screen = Process(target=calib_screen.CalibrationScreen,
                     args=(1280,720,3,4,self.marker, self.pipe_child, 2,))
         else:
-            calib_left  = calibrator.Calibrator(binocular=False)
-            calib_right = calibrator.Calibrator(binocular=False) 
+            calib_left  = calibrator.Calibrator(12, binocular=False)
+            calib_right = calibrator.Calibrator(12, binocular=False) 
             self.calibrations[id][0] = calib_left
             self.calibrations[id][1] = calib_right
             self.screen = Process(target=calib_screen.CalibrationScreen,
@@ -120,15 +102,15 @@ class Controller():
             self.active = False
 
 
-    def __collect_data(self, target, leye, reye):
+    def __collect_data(self, target, t_id, leye, reye):
         id = self.calibrating
         if target is not None and leye is not None and reye is not None and id:
             if self.in3d:
                 #print('collecting:', target, leye, reye)
                 self.calibrations[id][0].collect_data(target, leye, reye)
             else:
-                self.calibrations[id][0].collect_data(target, leye)
-                self.calibrations[id][1].collect_data(target, reye)
+                self.calibrations[id][0].collect_data(target, t_id, leye)
+                self.calibrations[id][1].collect_data(target, t_id, reye)
 
 
     def run(self, publish, ip=""):
@@ -143,6 +125,7 @@ class Controller():
         kbd = view.View(self, self.pipe_father)
         scn.start()
         kbd.start()
+        target_id = -1
         # net = network.Network()
         # if publish:
         #     net.create_connection(ip)
@@ -154,11 +137,15 @@ class Controller():
                 re_c = self.right_e.centroid
                 if self.calibrating:
                     target = scn.get_marker_position()
-                    self.__collect_data(target, le_c, re_c)
                     if self.pipe_father.poll():
-                        cv2.imshow('calibration', self.pipe_father.recv())
+                        target_img = self.pipe_father.recv()
+                        target_id += 1
+                        cv2.imshow('calibration', target_img)
+                    self.__collect_data(target, target_id, le_c, re_c)
                 elif self.active:
                     id = self.active
+                    self.calibrations[id][0].plot_data()
+                    self.calibrations[id][1].plot_data()
                     lcoord = self.calibrations[id][0].predict(le_c,w=1280,h=720)
                     rcoord = self.calibrations[id][1].predict(re_c,w=1280,h=720)
                     if lcoord is not None and rcoord is not None:

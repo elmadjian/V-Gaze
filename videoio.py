@@ -32,6 +32,7 @@ class VideoIO():
 
     def get_rs_id(self):
         if self.rs_id is not None:
+            print('scene camera id:', self.rs_id)
             return self.rs_id
         print("Could not find RealSense camera (yet)")
 
@@ -39,9 +40,11 @@ class VideoIO():
     def get_eye_id(self, side):
         if side == 'left':
             if self.eye_id_1 is not None:
+                print('left eye camera id:', self.eye_id_1)
                 return self.eye_id_1
         elif side == 'right':
             if self.eye_id_2 is not None:
+                print('right eye camera id:', self.eye_id_2)
                 return self.eye_id_2
         print(side.capitalize() + " eye camera is not plugged in")
             

@@ -23,7 +23,7 @@ class CalibrationScreen():
         self.target = cv2.resize(self.target, (size,size))
         hgap = ((self.w - self.border)-(4*size))//5
         vgap = ((self.h - self.border)-(3*size))//5
-        for p in range(len(self.planes)):
+        for p in range(self.planes):
             self.__cycle(hgap, vgap, size)
 
 
