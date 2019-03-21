@@ -57,9 +57,7 @@ class Tracker():
                 img = np.where(tmp == 255, blur, img)
             count += 1
         return img    
-            
-
-    
+                
 
     def __get_blob(self, bin_img):
         '''

@@ -82,8 +82,10 @@ class Controller():
 
     def end_calibration(self):
         id = self.calibrating
+        self.calibrations[id][0].clean_up_data(2)
         self.calibrations[id][0].estimate_gaze()
         if not self.in3d:
+            self.calibrations[id][1].clean_up_data(2)
             self.calibrations[id][1].estimate_gaze()
         self.calibrating = False
         if self.in3d == 'hololens':

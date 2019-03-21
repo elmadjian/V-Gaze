@@ -21,19 +21,34 @@ class Calibrator():
 
 
     def collect_data(self, target, t_id, leye, reye=None):
-        diff = np.abs(np.subtract(self.calib_point, target))
-        if np.sum(diff) > 0.09:
-            self.calib_point = target
-            self.countdown = 9
-        self.countdown -= 1
-        if self.countdown <= 0:
-            self.targets[t_id] = np.vstack((self.targets, target))
-            self.l_centers[t_id] = np.vstack((self.l_centers, leye))
-            if reye is not None:
-                self.r_centers[t_id] = np.vstack((self.r_centers, reye))
+        self.targets[t_id] = np.vstack((self.targets[t_id], target))
+        self.l_centers[t_id] = np.vstack((self.l_centers[t_id], leye))
+        if reye is not None:
+            self.r_centers[t_id] = np.vstack((self.r_centers[t_id], reye))
 
-    def __clean_up_data(self):
-        pass
+
+    def clean_up_data(self, deviation, reye=None):
+        targets   = {i:np.empty((0,2), float) for i in range(self.ntg)}
+        l_centers = {i:np.empty((0,2), float) for i in range(self.ntg)}
+        r_centers = {i:np.empty((0,2), float) for i in range(self.ntg)}
+        for t in self.targets.keys():
+            nx, ny = self.__get_outliers(l_centers[t])
+            for i in range(len(self.targets[t])):
+                if nx[i] < deviation and ny[i] < deviation:
+                    l_centers[t] = np.vstack((l_centers[t], self.l_centers[t][i]))
+                    targets[t]   = np.vstack((targets[t], self.targets[t][i]))
+                    if reye is not None:
+                        r_centers[t] = np.vstack((r_centers[t], self.r_centers[t][i]))
+        self.targets = targets
+        self.l_centers = l_centers
+        self.r_centers = r_centers
+                    
+
+    def __get_outliers(self, data):
+        d      = np.abs(data - np.median(data, axis=0))
+        std    = np.std(d)
+        nx, ny = d[:,0]/std, d[:,1]/std
+        return nx, ny
 
 
     def estimate_gaze(self):
